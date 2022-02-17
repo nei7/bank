@@ -6,19 +6,19 @@ import (
 
 	"github.com/nei7/bank/api"
 	"github.com/nei7/bank/internal/db"
+	"github.com/nei7/bank/util"
 
 	_ "github.com/lib/pq"
 )
 
-const (
-	dbDriver   = "postgres"
-	dbSource   = "postgresql://root:password@localhost:5432/simple_bank?sslmode=disable"
-	serverAddr = ":3000"
-)
-
 func main() {
 
-	conn, err := sql.Open(dbDriver, dbSource)
+	config, err := util.LoadConfig(".")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	conn, err := sql.Open(config.DBDriver, config.DBSource)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -26,7 +26,7 @@ func main() {
 	store := db.NewStore(conn)
 	server := api.NewServer(store)
 
-	err = server.Start(serverAddr)
+	err = server.Start(config.ServerAddress)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"database/sql"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -12,10 +13,10 @@ type createAccountRequest struct {
 	Currency string `json:"currency" binding:"required,oneof=USD EUR PLN"`
 }
 
-func (server *Server) createAccount(ctx *gin.Context) {
+func (server *Server) createAccount(c *gin.Context) {
 	var request createAccountRequest
-	if err := ctx.ShouldBind(&request); err != nil {
-		ctx.JSON(http.StatusBadRequest, errResponse(err))
+	if err := c.ShouldBind(&request); err != nil {
+		c.JSON(http.StatusBadRequest, errResponse(err))
 		return
 	}
 
@@ -25,11 +26,65 @@ func (server *Server) createAccount(ctx *gin.Context) {
 		Balance:  0,
 	}
 
-	account, err := server.store.CreateAccount(ctx, arg)
+	account, err := server.store.CreateAccount(c, arg)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errResponse(err))
+		c.JSON(http.StatusInternalServerError, errResponse(err))
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, account)
+	c.JSON(http.StatusCreated, account)
+}
+
+type getAccountRequest struct {
+	ID int64 `uri:"id" binding:"required,min=1"`
+}
+
+func (server *Server) getAccount(c *gin.Context) {
+	var req getAccountRequest
+	if err := c.ShouldBindUri(&req); err != nil {
+		c.JSON(400, errResponse(err))
+		return
+	}
+
+	account, err := server.store.GetAccount(c, req.ID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, errResponse(err))
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, errResponse(err))
+		return
+	}
+
+	c.JSON(http.StatusOK, account)
+}
+
+type listAccountsRequest struct {
+	PageID   int32 `form:"page_id" binding:"required,min=1"`
+	PageSize int32 `form:"page_size" binding:"required,min=5,max=10"`
+}
+
+func (server *Server) listAccounts(c *gin.Context) {
+	var req listAccountsRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, errResponse(err))
+		return
+	}
+
+	accounts, err := server.store.ListAccounts(c, db.ListAccountsParams{
+		Limit:  req.PageSize,
+		Offset: (req.PageID - 1) * req.PageSize,
+	})
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, errResponse(err))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, errResponse(err))
+		return
+	}
+
+	c.JSON(http.StatusOK, accounts)
 }
