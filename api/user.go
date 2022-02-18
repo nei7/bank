@@ -17,6 +17,7 @@ type createUserRequest struct {
 }
 
 func (server *Server) createUser(c *gin.Context) {
+
 	var request createUserRequest
 	if err := c.ShouldBind(&request); err != nil {
 		c.JSON(http.StatusBadRequest, errResponse(err))

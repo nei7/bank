@@ -21,7 +21,7 @@ INSERT INTO users (
 type CreateUserParams struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
-	FullName string `json:"fullName"`
+	FullName string `json:"full_name"`
 	Email    string `json:"email"`
 }
 
