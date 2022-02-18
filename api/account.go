@@ -2,15 +2,16 @@ package api
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lib/pq"
 	"github.com/nei7/bank/internal/db"
+	"github.com/nei7/bank/token"
 )
 
 type createAccountRequest struct {
-	Owner    string `json:"owner" binding:"required"`
 	Currency string `json:"currency" binding:"required,currency"`
 }
 
@@ -21,8 +22,10 @@ func (server *Server) createAccount(c *gin.Context) {
 		return
 	}
 
+	authPayload := c.MustGet(authorizationPayloadKey).(*token.Payload)
+
 	arg := db.CreateAccountParams{
-		Owner:    request.Owner,
+		Owner:    authPayload.Username,
 		Currency: request.Currency,
 		Balance:  0,
 	}
@@ -51,7 +54,7 @@ type getAccountRequest struct {
 func (server *Server) getAccount(c *gin.Context) {
 	var req getAccountRequest
 	if err := c.ShouldBindUri(&req); err != nil {
-		c.JSON(400, errResponse(err))
+		c.JSON(http.StatusBadRequest, errResponse(err))
 		return
 	}
 
@@ -63,6 +66,13 @@ func (server *Server) getAccount(c *gin.Context) {
 		}
 
 		c.JSON(http.StatusInternalServerError, errResponse(err))
+		return
+	}
+
+	authPayload := c.MustGet(authorizationPayloadKey).(*token.Payload)
+	if account.Owner != authPayload.Username {
+		err := errors.New("account doesn't belong to authenticated user")
+		c.JSON(http.StatusForbidden, errResponse(err))
 		return
 	}
 
@@ -81,7 +91,9 @@ func (server *Server) listAccounts(c *gin.Context) {
 		return
 	}
 
+	authPayload := c.MustGet(authorizationPayloadKey).(*token.Payload)
 	accounts, err := server.store.ListAccounts(c, db.ListAccountsParams{
+		Owner:  authPayload.Username,
 		Limit:  req.PageSize,
 		Offset: (req.PageID - 1) * req.PageSize,
 	})
